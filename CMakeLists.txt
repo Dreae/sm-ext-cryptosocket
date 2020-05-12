@@ -1,6 +1,12 @@
 cmake_minimum_required(VERSION 3.5)
 project(cryptosocket)
 
+set(SOURCE_FILES
+    src/smsdk_ext.cpp
+    src/smn_cryptosocket.cpp
+    src/extension.cpp
+    src/encrypted_socket.cpp)
+
 if(NOT TARGET)
     set(TARGET linux)
 endif()
@@ -18,7 +24,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -s")
 set(CMAKE_SKIP_BUILD_RPATH true)
 set(CMAKE_VERBOSE_MAKEFILE false)
 
-include_directories(sourcemod/public sourcepawn/include amtl)
+include_directories(sourcemod/public sourcepawn/include amtl amtl/amtl)
 
 add_library(cryptosocket.ext SHARED ${SOURCE_FILES})
 
