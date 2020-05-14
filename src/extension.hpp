@@ -1,6 +1,4 @@
-#ifndef _INCLUDE_SOURCEMOD_EXTENSION_PROPER_H_
-#define _INCLUDE_SOURCEMOD_EXTENSION_PROPER_H_
-
+#pragma once
 #include "smsdk_ext.h"
 
 class CryptoSockets : public SDKExtension {
@@ -26,5 +24,3 @@ private:
 };
 
 extern CryptoSockets extension;
-
-#endif

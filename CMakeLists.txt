@@ -16,7 +16,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pipe -DSOURCEMOD_BUILD -fno-strict-alia
 if(${TARGET} STREQUAL linux)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_LINUX")
 else()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DWIN32 -D_STAT_DEFINED")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DWIN32 -D_STAT_DEFINED -DSODIUM_STATIC")
 endif()
 
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -s")
@@ -29,9 +29,9 @@ include_directories(sourcemod/public sourcepawn/include amtl amtl/amtl)
 add_library(cryptosocket.ext SHARED ${SOURCE_FILES})
 
 if(${TARGET} STREQUAL linux)
-    target_link_libraries(cryptosocket.ext -lpthread -Wl,--no-undefined -lcrypto++ -Wl,-Bstatic -static-libgcc -lboost_thread -lboost_system -lstdc++ -Wl,-Bdynamic -lm -ldl)
+    target_link_libraries(cryptosocket.ext -lpthread -Wl,--no-undefined -Wl,-Bstatic -lsodium -static-libgcc -lboost_thread -lboost_system -lstdc++ -Wl,-Bdynamic -lm -ldl)
 else()
-    target_link_libraries(cryptosocket.ext -lpthread -Wl,--no-undefined -lcrypto++ -Wl,-Bstatic -static-libgcc -lboost_thread-mt -lboost_system -lstdc++ -Wl,-Bdynamic -lm -lwsock32 -lgdi32 -lws2_32)
+    target_link_libraries(cryptosocket.ext -lpthread -Wl,--no-undefined -Wl,-Bstatic -lsodium -static-libgcc -lboost_thread-mt -lboost_system -lstdc++ -Wl,-Bdynamic -lm -lwsock32 -lgdi32 -lws2_32)
 endif()
 
 set_target_properties(cryptosocket.ext PROPERTIES PREFIX "")
