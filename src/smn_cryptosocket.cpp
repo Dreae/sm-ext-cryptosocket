@@ -1,6 +1,7 @@
 #include "extension.hpp"
 #include "encrypted_socket.hpp"
 #include "handletypes.hpp"
+#include "crypto_ev.hpp"
 
 extern const sp_nativeinfo_t smcryptosocket_natives[];
 HandleType_t _encrypted_socket_handletype;
@@ -54,8 +55,19 @@ static cell_t CreateEncryptedSocket(IPluginContext *pContext, const cell_t *para
     char *key_id, *key;
     pContext->LocalToString(params[1], &key_id);
     pContext->LocalToString(params[2], &key);
-
-    auto socket = new encrypted_socket(string(key_id), string(key));
+    auto callback = pContext->GetFunctionById((funcid_t)params[3]);
+    if (!callback) {
+        pContext->ReportError("Invalid handler callback provided");
+        return 0;
+    }
+    
+    auto socket = new encrypted_socket(string(key_id), string(key), [callback](shared_ptr<uint8_t[]> data, size_t size) {
+        event_loop.add_event_callback([data, size, callback]() {
+            callback->PushStringEx(reinterpret_cast<char *>(data.get()), size, SM_PARAM_STRING_BINARY, 0);
+            callback->PushCell(size);
+            callback->Execute(nullptr);
+        });
+    });
     auto hndl = handlesys->CreateHandle(_encrypted_socket_handletype, socket, pContext->GetIdentity(), myself->GetIdentity(), NULL);
 
     return hndl;
@@ -68,13 +80,14 @@ static cell_t EncryptedSocketConnect(IPluginContext *pContext, const cell_t *par
     uint16_t port = params[2];
     auto callback = pContext->GetFunctionById((funcid_t)params[3]);
     if (!callback) {
-        pContext->ReportError("Invalid connect callback specified");
+        socket->connect(nullopt, string(address), port);
         return 0;
     }
 
     socket->connect([callback]() {
-        // TODO: Calling `callback` here is likely unsafe
-        // the SourcePawn runtime is not thread-safe
+        event_loop.add_event_callback([callback]() {
+            callback->Execute(nullptr);
+        });
     }, string(address), port);
 
     return 0;

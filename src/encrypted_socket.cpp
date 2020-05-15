@@ -1,7 +1,7 @@
 #include "encrypted_socket.hpp"
 #include "sodium.h"
 
-encrypted_socket::encrypted_socket(string key_id, string key) {
+encrypted_socket::encrypted_socket(string key_id, string key, data_callback data_cb) {
     this->service = make_unique<boost::asio::io_service>();
     this->socket = make_unique<tcp::socket>(*this->service);
     this->work = make_unique<boost::asio::io_service::work>(*this->service);
@@ -12,11 +12,12 @@ encrypted_socket::encrypted_socket(string key_id, string key) {
     this->connected = false;
     this->key_id = key_id;
     this->key = key;
+    this->data_cb = data_cb;
 
     randombytes_buf(this->nonce_seed, 32);
 }
 
-void encrypted_socket::connect(connect_callback callback, string address, uint16_t port) {
+void encrypted_socket::connect(optional<connect_callback> callback, string address, uint16_t port) {
     auto resolver = make_shared<tcp::resolver>(*this->service);
 
     char s_port[8];
@@ -42,7 +43,7 @@ void encrypted_socket::connect(connect_callback callback, string address, uint16
     });
 }
 
-void encrypted_socket::start_kx(connect_callback callback) {
+void encrypted_socket::start_kx(optional<connect_callback> callback) {
     randombytes_buf(this->kx_sk, crypto_box_SECRETKEYBYTES);
     crypto_scalarmult_base(this->kx_pk, this->kx_sk);
     sodium_mprotect_noaccess(this->kx_sk);
@@ -66,20 +67,20 @@ void encrypted_socket::start_kx(connect_callback callback) {
     auto self(shared_from_this());
     boost::asio::async_write(*this->socket, buffer, [this, self](boost::system::error_code ec, size_t n_written) {
         if (ec) {
-            smutils->LogMessage(myself, "Error during handshake: %s", ec.message());
+            smutils->LogMessage(myself, "Error during handshake: %s", ec.message().c_str());
         }
     });
 
     self->finish_kx(callback);
 }
 
-void encrypted_socket::finish_kx(connect_callback callback) {
+void encrypted_socket::finish_kx(optional<connect_callback> callback) {
     auto self(shared_from_this());
-    this->start_read_msg([this, self, callback](unique_ptr<uint8_t[]> buffer, size_t msg_len) {
-        auto server_kx_pk = reinterpret_cast<const unsigned char*>(&buffer);
-        auto server_key_id = reinterpret_cast<const char*>(&buffer + crypto_box_PUBLICKEYBYTES);
+    this->start_read_msg([this, self, callback](shared_ptr<uint8_t[]> buffer, size_t msg_len) {
+        auto server_kx_pk = reinterpret_cast<const unsigned char*>(buffer.get());
+        auto server_key_id = reinterpret_cast<const char*>(buffer.get() + crypto_box_PUBLICKEYBYTES);
         auto key_id_len = strlen(server_key_id);
-        auto signature = reinterpret_cast<const unsigned char*>(&buffer + crypto_box_PUBLICKEYBYTES + key_id_len + 1);
+        auto signature = reinterpret_cast<const unsigned char*>(buffer.get() + crypto_box_PUBLICKEYBYTES + key_id_len + 1);
         
         unsigned char derived_key[crypto_hash_sha512_BYTES];
         crypto_hash_sha512_state state;
@@ -87,7 +88,7 @@ void encrypted_socket::finish_kx(connect_callback callback) {
         crypto_hash_sha512_update(&state, reinterpret_cast<const unsigned char*>(this->key.c_str()), this->key.length());
         crypto_hash_sha512_final(&state, derived_key);
 
-        if (crypto_auth_verify(signature, reinterpret_cast<const unsigned char*>(&buffer), crypto_box_PUBLICKEYBYTES + key_id_len + 1, derived_key) != 0) {
+        if (crypto_auth_verify(signature, reinterpret_cast<const unsigned char*>(buffer.get()), crypto_box_PUBLICKEYBYTES + key_id_len + 1, derived_key) != 0) {
             smutils->LogError(myself, "Hanshake error, signature mismatch");
             return;
         }
@@ -108,7 +109,18 @@ void encrypted_socket::finish_kx(connect_callback callback) {
         sodium_mprotect_noaccess(this->session_key);
         sodium_free(this->kx_sk);
         sodium_free(this->kx_pk);
-        callback();
+
+        if (callback.has_value()) {
+            (*callback)();
+        }
+    });
+}
+
+void encrypted_socket::start_msg_loop() {
+    auto self(shared_from_this());
+    this->start_read_msg([this, self](shared_ptr<uint8_t[]> data, size_t size) {
+        this->data_cb(data, size);
+        this->start_msg_loop();
     });
 }
 
@@ -130,11 +142,11 @@ void encrypted_socket::do_read(data_callback callback) {
 
     boost::asio::async_read(*this->socket, *this->buffer, boost::asio::transfer_exactly(this->msg_size), [this, self, callback](boost::system::error_code ec, size_t n_bytes) {
         if (!ec) {
-            auto buffer = make_unique<uint8_t[]>(this->buffer->size());
-            memcpy(&buffer, boost::asio::buffer_cast<const uint8_t *>(this->buffer->data()), this->buffer->size());
+            auto buffer = make_shared<uint8_t[]>(this->buffer->size());
+            memcpy(buffer.get(), boost::asio::buffer_cast<const uint8_t *>(this->buffer->data()), this->buffer->size());
             this->buffer = unique_ptr<boost::asio::streambuf>(new boost::asio::streambuf());
 
-            callback(move(buffer), this->buffer->size());
+            callback(buffer, this->buffer->size());
         } else {
             smutils->LogError(myself, "Error reading packet: %s", ec.message().c_str());
             callback(NULL, 0);

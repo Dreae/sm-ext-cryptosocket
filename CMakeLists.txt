@@ -10,8 +10,7 @@ set(SOURCE_FILES
 if(NOT TARGET)
     set(TARGET linux)
 endif()
-set (CMAKE_CXX_STANDARD 14)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pipe -DSOURCEMOD_BUILD -fno-strict-aliasing -m32")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -pipe -DSOURCEMOD_BUILD -fno-strict-aliasing -m32")
 
 if(${TARGET} STREQUAL linux)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_LINUX")
