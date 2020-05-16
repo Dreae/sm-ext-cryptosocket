@@ -14,6 +14,7 @@ public:
 
     encrypted_socket(string key_id, string key, data_callback callback);
     void connect(optional<connect_callback> callback, string address, uint16_t  port);
+    void send(unique_ptr<uint8_t[]> data, size_t data_size);
 private:
     void start_kx(optional<connect_callback> callback);
     void finish_kx(optional<connect_callback> callback);
@@ -21,6 +22,8 @@ private:
     void start_msg_loop();
     void start_read_msg(data_callback callback);
     void do_read(data_callback callback);
+
+    unique_ptr<uint8_t[]> generate_nonce();
 
     unique_ptr<tcp::socket> socket;
     unique_ptr<boost::asio::io_service> service;

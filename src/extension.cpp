@@ -7,7 +7,10 @@ SMEXT_LINK(&extension);
 CryptoSockBase *CryptoSockBase::head = NULL;
 
 bool CryptoSockets::SDK_OnLoad(char *error, size_t err_max, bool late) {
-    sodium_init();
+    int sodium_res;
+    if ((sodium_res = sodium_init()) < 0) {
+        sprintf(error, "Error initializing sodium (err %d)", sodium_res);
+    }
 
     CryptoSockBase *head = CryptoSockBase::head;
     while (head) {
