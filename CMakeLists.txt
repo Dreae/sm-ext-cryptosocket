@@ -5,7 +5,8 @@ set(SOURCE_FILES
     src/smsdk_ext.cpp
     src/smn_cryptosocket.cpp
     src/extension.cpp
-    src/encrypted_socket.cpp)
+    src/encrypted_socket.cpp
+    src/crypto_ev.cpp)
 
 if(NOT TARGET)
     set(TARGET linux)
@@ -36,5 +37,5 @@ endif()
 set_target_properties(cryptosocket.ext PROPERTIES PREFIX "")
 
 if(NOT ${TARGET} STREQUAL linux)
-    set_target_properties(rpc.ext PROPERTIES SUFFIX ".dll")
+    set_target_properties(cryptosocket.ext PROPERTIES SUFFIX ".dll")
 endif()

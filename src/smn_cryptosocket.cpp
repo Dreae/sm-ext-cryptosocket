@@ -93,8 +93,22 @@ static cell_t EncryptedSocketConnect(IPluginContext *pContext, const cell_t *par
     return 0;
 }
 
+static cell_t EncryptedSocketSend(IPluginContext *pContext, const cell_t *params) {
+    READ_HANDLE(pContext, params);
+    uint8_t *data;
+    pContext->LocalToPhysAddr(params[1], reinterpret_cast<cell_t **>(&data));
+    auto data_size = params[2];
+    auto data_copy = make_unique<uint8_t[]>(data_size);
+    memcpy(data_copy.get(), data, data_size);
+
+    socket->send(move(data_copy), data_size);
+
+    return 0;
+}
+
 const sp_nativeinfo_t smcryptosocket_natives[] = {
-    {"CreateEncryptedSocket", CreateEncryptedSocket},
+    {"EncryptedSocket.EncryptedSocket", CreateEncryptedSocket},
     {"EncryptedSocket.Connect", EncryptedSocketConnect},
+    {"EncryptedSocket.Send", EncryptedSocketSend},
     {NULL, NULL}
 };

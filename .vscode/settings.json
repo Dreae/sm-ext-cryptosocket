@@ -66,5 +66,6 @@
         "typeinfo": "cpp",
         "variant": "cpp",
         "queue": "cpp"
-    }
+    },
+    "sourcepawnLanguageServer.sourcemod_home": "/home/dreae/sm-ext-cryptosocket/sourcemod/plugins/include"
 }
