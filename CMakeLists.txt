@@ -29,10 +29,11 @@ include_directories(sourcemod/public sourcepawn/include amtl amtl/amtl)
 add_library(cryptosocket.ext SHARED ${SOURCE_FILES})
 
 if(${TARGET} STREQUAL linux)
-    target_link_libraries(cryptosocket.ext -lpthread -Wl,--no-undefined -Wl,-Bstatic -lsodium -static-libgcc -lboost_thread -lboost_system -lstdc++ -Wl,-Bdynamic -lm -ldl)
+    target_link_libraries(cryptosocket.ext -lpthread -Wl,--no-undefined -Wl,-Bstatic -lsodium -static-libgcc -lboost_system -static-libstdc++ -Wl,-Bdynamic)
 else()
-    target_link_libraries(cryptosocket.ext -lpthread -Wl,--no-undefined -Wl,-Bstatic -lsodium -static-libgcc -lboost_thread-mt -lboost_system -lstdc++ -Wl,-Bdynamic -lm -lwsock32 -lgdi32 -lws2_32)
+    target_link_libraries(cryptosocket.ext -Wl,--no-undefined -Wl,-Bstatic -lc -lsodium -static-libgcc -lboost_system -static-libstdc++ -Wl,-Bdynamic -lm -lwsock32 -lgdi32 -lws2_32)
 endif()
+
 
 set_target_properties(cryptosocket.ext PROPERTIES PREFIX "")
 

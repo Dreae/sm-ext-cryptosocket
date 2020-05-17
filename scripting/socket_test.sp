@@ -1,5 +1,5 @@
 #include <sourcemod>
-#include <cryptosocket>
+#include "include/cryptosocket"
 
 public Plugin myinfo = {
     name = "SocketTest",
@@ -13,8 +13,8 @@ EncryptedSocket socket = null;
 
 public void OnPluginStart() {
     RegServerCmd("cryptosocket_test", socket_test);
+    RegServerCmd("cryptosocket_connect", socket_connect);
     socket = new EncryptedSocket("key_id", "testkey", data_callback);
-    socket.Connect("127.0.0.1", "4147");
 }
 
 public Action socket_test(int args) {
@@ -23,4 +23,14 @@ public Action socket_test(int args) {
     socket.Send(argString, strlen(argString));
 
     return Plugin_Handled;
+}
+
+public Action socket_connect(int args) {
+    socket.Connect("127.0.0.1", 4147);
+
+    return Plugin_Handled;
+}
+
+public void data_callback(const char[] data, int data_size) {
+    PrintToServer("Got data %s", data);
 }

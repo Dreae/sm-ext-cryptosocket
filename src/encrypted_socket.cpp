@@ -25,6 +25,7 @@ void encrypted_socket::connect(optional<connect_callback> callback, string addre
     snprintf(s_port, sizeof(s_port), "%hu", port);
     tcp::resolver::query query(address.c_str(), s_port);
     
+    smutils->LogMessage(myself, "Resolving %s", address.c_str());
     auto self(shared_from_this());
     resolver->async_resolve(query, [this, self, resolver, address, port, callback](boost::system::error_code ec, tcp::resolver::iterator i) {
         if (ec) {
@@ -72,7 +73,7 @@ void encrypted_socket::start_kx(optional<connect_callback> callback) {
         }
     });
 
-    self->finish_kx(callback);
+    this->finish_kx(callback);
 }
 
 void encrypted_socket::finish_kx(optional<connect_callback> callback) {
@@ -159,7 +160,7 @@ void encrypted_socket::send(unique_ptr<uint8_t[]> data, size_t data_size) {
     os.write(reinterpret_cast<const char *>(&msg_len), 2);
     os.write(reinterpret_cast<const char *>(nonce.get()), crypto_aead_chacha20poly1305_NPUBBYTES);
     os.write(reinterpret_cast<const char *>(ciphertext), ciphertext_len);
-
+    
     auto self(shared_from_this());
     boost::asio::async_write(*this->socket, buffer, [this, self](boost::system::error_code ec, size_t n_written) {
         if (ec) {
@@ -178,7 +179,6 @@ unique_ptr<uint8_t[]> encrypted_socket::generate_nonce() {
 
 void encrypted_socket::start_read_msg(data_callback callback) {
     auto self(shared_from_this());
-    
     boost::asio::async_read(*this->socket, *this->buffer, boost::asio::transfer_exactly(2), [this, self, callback](boost::system::error_code ec, size_t n_bytes) {
         if (!ec) {
             this->msg_size = *boost::asio::buffer_cast<const uint16_t *>(this->buffer->data());
@@ -192,7 +192,6 @@ void encrypted_socket::start_read_msg(data_callback callback) {
 
 void encrypted_socket::do_read(data_callback callback) {
     auto self(shared_from_this());
-
     boost::asio::async_read(*this->socket, *this->buffer, boost::asio::transfer_exactly(this->msg_size), [this, self, callback](boost::system::error_code ec, size_t n_bytes) {
         if (!ec) {
             auto buffer = make_shared<uint8_t[]>(this->buffer->size());

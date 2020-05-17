@@ -2,12 +2,13 @@
 #include "extension.hpp"
 #include <boost/asio.hpp>
 #include <optional>
+#include "crypto_io_service.hpp"
 
 using boost::asio::ip::tcp;
 
 using namespace std;
 
-class encrypted_socket : public enable_shared_from_this<encrypted_socket> {
+class encrypted_socket : public crypto_io_service, public enable_shared_from_this<encrypted_socket> {
 public:
     typedef function<void(shared_ptr<uint8_t[]>, size_t)> data_callback;
     typedef function<void()> connect_callback;
@@ -15,6 +16,7 @@ public:
     encrypted_socket(string key_id, string key, data_callback callback);
     void connect(optional<connect_callback> callback, string address, uint16_t  port);
     void send(unique_ptr<uint8_t[]> data, size_t data_size);
+    bool connected;
 private:
     void start_kx(optional<connect_callback> callback);
     void finish_kx(optional<connect_callback> callback);
@@ -26,7 +28,6 @@ private:
     unique_ptr<uint8_t[]> generate_nonce();
 
     unique_ptr<tcp::socket> socket;
-    unique_ptr<boost::asio::io_service> service;
     unique_ptr<boost::asio::io_service::work> work;
     unique_ptr<boost::asio::streambuf> buffer;
 
@@ -39,7 +40,6 @@ private:
     uint32_t nonce_counter;
     uint8_t nonce_seed[32];
 
-    bool connected;
     size_t msg_size;
     data_callback data_cb;
 };

@@ -61,14 +61,17 @@ static cell_t CreateEncryptedSocket(IPluginContext *pContext, const cell_t *para
         return 0;
     }
     
-    auto socket = new encrypted_socket(string(key_id), string(key), [callback](shared_ptr<uint8_t[]> data, size_t size) {
+    auto socket = make_shared<encrypted_socket>(string(key_id), string(key), [callback](shared_ptr<uint8_t[]> data, size_t size) {
         event_loop.add_event_callback([data, size, callback]() {
             callback->PushStringEx(reinterpret_cast<char *>(data.get()), size, SM_PARAM_STRING_BINARY, 0);
             callback->PushCell(size);
             callback->Execute(nullptr);
         });
     });
-    auto hndl = handlesys->CreateHandle(_encrypted_socket_handletype, socket, pContext->GetIdentity(), myself->GetIdentity(), NULL);
+
+    event_loop.add_service(socket);
+
+    auto hndl = handlesys->CreateHandle(_encrypted_socket_handletype, socket.get(), pContext->GetIdentity(), myself->GetIdentity(), NULL);
 
     return hndl;
 }
@@ -76,28 +79,34 @@ static cell_t CreateEncryptedSocket(IPluginContext *pContext, const cell_t *para
 static cell_t EncryptedSocketConnect(IPluginContext *pContext, const cell_t *params) {
     READ_HANDLE(pContext, params);
     char *address;
-    pContext->LocalToString(params[1], &address);
-    uint16_t port = params[2];
-    auto callback = pContext->GetFunctionById((funcid_t)params[3]);
+    pContext->LocalToString(params[2], &address);
+    uint16_t port = params[3];
+    auto callback = pContext->GetFunctionById((funcid_t)params[4]);
+
+    auto addr = string(address);
+    smutils->LogMessage(myself, "Attempting to connect to %s:%d", addr.c_str(), port);
     if (!callback) {
-        socket->connect(nullopt, string(address), port);
-        return 0;
+        socket->connect(nullopt, addr, port);
+    } else {
+        socket->connect([callback]() {
+            event_loop.add_event_callback([callback]() {
+                callback->Execute(nullptr);
+            });
+        }, addr, port);
     }
 
-    socket->connect([callback]() {
-        event_loop.add_event_callback([callback]() {
-            callback->Execute(nullptr);
-        });
-    }, string(address), port);
 
     return 0;
 }
 
 static cell_t EncryptedSocketSend(IPluginContext *pContext, const cell_t *params) {
     READ_HANDLE(pContext, params);
+    if (!socket->connected) {
+        pContext->ReportError("Socket is not connected");
+    }
     uint8_t *data;
-    pContext->LocalToPhysAddr(params[1], reinterpret_cast<cell_t **>(&data));
-    auto data_size = params[2];
+    pContext->LocalToPhysAddr(params[2], reinterpret_cast<cell_t **>(&data));
+    auto data_size = params[3];
     auto data_copy = make_unique<uint8_t[]>(data_size);
     memcpy(data_copy.get(), data, data_size);
 
