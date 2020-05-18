@@ -3,21 +3,22 @@
 #include <queue>
 #include <functional>
 #include <mutex>
-#include "crypto_io_service.hpp"
 #include <memory>
+#include <boost/asio.hpp>
 
 using namespace std;
 
 class crypto_event_loop : public CryptoSockBase {
 public:
-    void add_event_callback(function<void()> callback);
-    void add_service(shared_ptr<crypto_io_service> service);
     void OnExtLoad();
+    void OnExtUnload();
     void run();
+
+    crypto_event_loop() : work(context) { }
+    boost::asio::io_context& get_context();
 private:
-    mutex mtx;
-    queue<function<void()>> callbacks;
-    vector<shared_ptr<crypto_io_service>> services;
+    boost::asio::io_context context;
+    boost::asio::io_context::work work;    
 };
 
 extern crypto_event_loop event_loop;

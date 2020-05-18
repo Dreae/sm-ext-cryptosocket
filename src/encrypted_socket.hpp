@@ -2,13 +2,12 @@
 #include "extension.hpp"
 #include <boost/asio.hpp>
 #include <optional>
-#include "crypto_io_service.hpp"
 
 using boost::asio::ip::tcp;
 
 using namespace std;
 
-class encrypted_socket : public crypto_io_service, public enable_shared_from_this<encrypted_socket> {
+class encrypted_socket {
 public:
     typedef function<void(shared_ptr<uint8_t[]>, size_t)> data_callback;
     typedef function<void()> connect_callback;

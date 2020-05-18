@@ -61,17 +61,15 @@ static cell_t CreateEncryptedSocket(IPluginContext *pContext, const cell_t *para
         return 0;
     }
     
-    auto socket = make_shared<encrypted_socket>(string(key_id), string(key), [callback](shared_ptr<uint8_t[]> data, size_t size) {
-        event_loop.add_event_callback([data, size, callback]() {
+    auto socket = new encrypted_socket(string(key_id), string(key), [callback](shared_ptr<uint8_t[]> data, size_t size) {
+        extension.Defer([data, size, callback]() {
             callback->PushStringEx(reinterpret_cast<char *>(data.get()), size, SM_PARAM_STRING_BINARY, 0);
             callback->PushCell(size);
             callback->Execute(nullptr);
         });
     });
 
-    event_loop.add_service(socket);
-
-    auto hndl = handlesys->CreateHandle(_encrypted_socket_handletype, socket.get(), pContext->GetIdentity(), myself->GetIdentity(), NULL);
+    auto hndl = handlesys->CreateHandle(_encrypted_socket_handletype, socket, pContext->GetIdentity(), myself->GetIdentity(), NULL);
 
     return hndl;
 }
@@ -89,7 +87,7 @@ static cell_t EncryptedSocketConnect(IPluginContext *pContext, const cell_t *par
         socket->connect(nullopt, addr, port);
     } else {
         socket->connect([callback]() {
-            event_loop.add_event_callback([callback]() {
+            extension.Defer([callback]() {
                 callback->Execute(nullptr);
             });
         }, addr, port);

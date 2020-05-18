@@ -28,3 +28,48 @@ void CryptoSockets::SDK_OnUnload() {
         head = head->next;
     }
 }
+
+void log_msg(void *msg) {
+    smutils->LogMessage(myself, reinterpret_cast<char *>(msg));
+    free(msg);
+}
+
+
+void log_err(void *msg) {
+    smutils->LogError(myself, reinterpret_cast<char *>(msg));
+    free(msg);
+}
+
+void CryptoSockets::LogMessage(const char *msg, ...) {
+    va_list vp;
+    va_start(vp, msg);
+
+    char *buffer = reinterpret_cast<char *>(malloc(3072));
+    vsnprintf(buffer, 3071, msg, vp);
+    
+    smutils->AddFrameAction(&log_msg, reinterpret_cast<void *>(buffer));
+
+    va_end(vp);
+}
+
+void CryptoSockets::LogError(const char *msg, ...) {
+    va_list vp;
+    va_start(vp, msg);
+
+    char *buffer = reinterpret_cast<char *>(malloc(3072));
+    vsnprintf(buffer, 3071, msg, vp);
+    
+    smutils->AddFrameAction(&log_err, reinterpret_cast<void *>(buffer));
+
+    va_end(vp);
+}
+
+void execute_cb(void *cb) {
+    std::unique_ptr<std::function<void()>> callback(reinterpret_cast<std::function<void()> *>(cb));
+    callback->operator()();
+}
+
+void CryptoSockets::Defer(std::function<void()> callback) {
+    std::unique_ptr<std::function<void()>> cb = std::make_unique<std::function<void()>>(callback);
+    smutils->AddFrameAction(&execute_cb, cb.release());
+}
