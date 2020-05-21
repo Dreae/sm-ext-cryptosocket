@@ -14,7 +14,8 @@
 	"extensions": [
 		"ms-vscode.cpptools",
         "ms-vscode.cmake-tools",
-        "dreae.sourcepawn-vscode"
+		"dreae.sourcepawn-vscode",
+		"gruntfuggly.todo-tree"
 	]
 
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.

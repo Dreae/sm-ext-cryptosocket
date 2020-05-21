@@ -61,11 +61,15 @@ static cell_t CreateEncryptedSocket(IPluginContext *pContext, const cell_t *para
         return 0;
     }
     
-    auto socket = new encrypted_socket(string(key_id), string(key), [callback](shared_ptr<uint8_t[]> data, size_t size) {
-        extension.Defer([data, size, callback]() {
-            callback->PushStringEx(reinterpret_cast<char *>(data.get()), size, SM_PARAM_STRING_BINARY, 0);
+    auto socket = new encrypted_socket(string(key_id), string(key), [callback](uint8_t *data, size_t size) {
+        auto data_copy = reinterpret_cast<uint8_t *>(malloc(size));
+        memcpy(data_copy, data, size);
+        extension.Defer([data_copy, size, callback]() {
+            callback->PushStringEx(reinterpret_cast<char *>(data_copy), size, SM_PARAM_STRING_BINARY | SM_PARAM_STRING_COPY, 0);
             callback->PushCell(size);
             callback->Execute(nullptr);
+
+            free(data_copy);
         });
     });
 
@@ -99,7 +103,7 @@ static cell_t EncryptedSocketConnect(IPluginContext *pContext, const cell_t *par
 
 static cell_t EncryptedSocketSend(IPluginContext *pContext, const cell_t *params) {
     READ_HANDLE(pContext, params);
-    if (!socket->connected) {
+    if (!socket->connected.load()) {
         pContext->ReportError("Socket is not connected");
     }
     uint8_t *data;

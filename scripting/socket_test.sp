@@ -14,7 +14,6 @@ EncryptedSocket socket = null;
 public void OnPluginStart() {
     RegServerCmd("cryptosocket_test", socket_test);
     RegServerCmd("cryptosocket_connect", socket_connect);
-    socket = new EncryptedSocket("key_id", "testkey", data_callback);
 }
 
 public Action socket_test(int args) {
@@ -26,7 +25,15 @@ public Action socket_test(int args) {
 }
 
 public Action socket_connect(int args) {
-    socket.Connect("127.0.0.1", 4147);
+    if (socket != INVALID_HANDLE) {
+        socket.Close();
+    }
+
+    char argString[256];
+    GetCmdArgString(argString, sizeof(argString));
+    
+    socket = new EncryptedSocket("key_id", "testkey", data_callback);
+    socket.Connect(argString, 4147);
 
     return Plugin_Handled;
 }

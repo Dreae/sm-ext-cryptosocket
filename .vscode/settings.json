@@ -67,5 +67,6 @@
         "variant": "cpp",
         "queue": "cpp",
         "*.ipp": "cpp"
-    }
+    },
+    "sourcepawnLanguageServer.sourcemod_home": "/workspaces/sm-ext-cryptosocket/sourcemod/plugins/include"
 }

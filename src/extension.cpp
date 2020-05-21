@@ -41,27 +41,23 @@ void log_err(void *msg) {
 }
 
 void CryptoSockets::LogMessage(const char *msg, ...) {
+    char *buffer = reinterpret_cast<char *>(malloc(3072));
     va_list vp;
     va_start(vp, msg);
-
-    char *buffer = reinterpret_cast<char *>(malloc(3072));
-    vsnprintf(buffer, 3071, msg, vp);
-    
-    smutils->AddFrameAction(&log_msg, reinterpret_cast<void *>(buffer));
-
+    vsnprintf(buffer, 3072, msg, vp);
     va_end(vp);
+
+    smutils->AddFrameAction(&log_msg, reinterpret_cast<void *>(buffer));
 }
 
 void CryptoSockets::LogError(const char *msg, ...) {
+    char *buffer = reinterpret_cast<char *>(malloc(3072));
     va_list vp;
     va_start(vp, msg);
-
-    char *buffer = reinterpret_cast<char *>(malloc(3072));
-    vsnprintf(buffer, 3071, msg, vp);
+    vsnprintf(buffer, 3072, msg, vp);
+    va_end(vp);
     
     smutils->AddFrameAction(&log_err, reinterpret_cast<void *>(buffer));
-
-    va_end(vp);
 }
 
 void execute_cb(void *cb) {
