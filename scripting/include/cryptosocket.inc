@@ -10,6 +10,7 @@ methodmap EncryptedSocket < Handle {
     public native EncryptedSocket(const char[] key_id, const char[] key, DataCallback callback);
     public native void Send(const char[] data, int data_size);
     public native void Connect(const char[] address, int port);
+    public native bool Connected();
 }
 
 public Extension:__ext_cryptosocket = {

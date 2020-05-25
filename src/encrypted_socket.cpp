@@ -3,11 +3,13 @@
 #include <boost/endian/conversion.hpp>
 #include "crypto_ev.hpp"
 
+#define BLAKE2b_SIZE 64
+
 encrypted_socket::encrypted_socket(string key_id, string key, data_callback data_cb) {
     this->socket = make_unique<tcp::socket>(event_loop.get_context());
     this->work = make_unique<boost::asio::io_context::work>(event_loop.get_context());
     this->buffer = nullptr;
-    this->session_key = reinterpret_cast<uint8_t *>(sodium_malloc(crypto_hash_sha512_BYTES));
+    this->session_key = reinterpret_cast<uint8_t *>(sodium_malloc(BLAKE2b_SIZE));
     this->kx_pk = reinterpret_cast<uint8_t *>(sodium_malloc(crypto_box_PUBLICKEYBYTES));
     this->kx_sk = reinterpret_cast<uint8_t *>(sodium_malloc(crypto_box_SECRETKEYBYTES));
     this->connected.store(false);
@@ -68,15 +70,11 @@ void encrypted_socket::start_kx(optional<connect_callback> callback) {
     buffer.insert(buffer.end(), reinterpret_cast<const uint8_t *>(this->key_id.c_str()), reinterpret_cast<const uint8_t *>(this->key_id.c_str()) + this->key_id.size());
     buffer.push_back(0);
     
-    unsigned char derived_key[crypto_hash_sha512_BYTES];
-    crypto_hash_sha512_state state;
-    crypto_hash_sha512_init(&state);
-    
-    sodium_mprotect_readonly(this->key);
-    crypto_hash_sha512_update(&state, reinterpret_cast<const unsigned char*>(this->key), this->key_size);
-    sodium_mprotect_noaccess(this->key);
+    unsigned char derived_key[BLAKE2b_SIZE];
 
-    crypto_hash_sha512_final(&state, derived_key);
+    sodium_mprotect_readonly(this->key);
+    crypto_generichash(derived_key, BLAKE2b_SIZE, reinterpret_cast<const unsigned char*>(this->key), this->key_size, NULL, 0);
+    sodium_mprotect_noaccess(this->key);
 
     unsigned char mac[crypto_auth_BYTES];
     crypto_auth(mac, buffer.data(), buffer.size(), derived_key);
@@ -101,15 +99,15 @@ void encrypted_socket::finish_kx(optional<connect_callback> callback) {
         auto key_id_len = strlen(server_key_id);
         auto signature = reinterpret_cast<const unsigned char*>(server_key_id) + key_id_len + 1;
 
-        unsigned char derived_key[crypto_hash_sha512_BYTES];
-        crypto_hash_sha512_state state;
-        crypto_hash_sha512_init(&state);
+        unsigned char derived_key[BLAKE2b_SIZE];
+        crypto_generichash_state state;
+        crypto_generichash_init(&state, NULL, 0, BLAKE2b_SIZE);
         
         sodium_mprotect_readonly(this->key);
-        crypto_hash_sha512_update(&state, reinterpret_cast<const unsigned char*>(this->key), this->key_size);
+        crypto_generichash_update(&state, reinterpret_cast<const unsigned char*>(this->key), this->key_size);
         sodium_mprotect_noaccess(this->key);
 
-        crypto_hash_sha512_final(&state, derived_key);
+        crypto_generichash_final(&state, derived_key, BLAKE2b_SIZE);
 
         if (crypto_auth_verify(signature, server_kx_pk, crypto_box_PUBLICKEYBYTES + key_id_len + 1, derived_key) != 0) {
             extension.LogError("Hanshake error, signature mismatch");
@@ -125,11 +123,11 @@ void encrypted_socket::finish_kx(optional<connect_callback> callback) {
         }
         sodium_mprotect_noaccess(this->kx_sk);
 
-        crypto_hash_sha512_init(&state);
-        crypto_hash_sha512_update(&state, scalarmult_shared_key, crypto_scalarmult_BYTES);
-        crypto_hash_sha512_update(&state, this->kx_pk, crypto_box_PUBLICKEYBYTES);
-        crypto_hash_sha512_update(&state, server_kx_pk, crypto_box_PUBLICKEYBYTES);
-        crypto_hash_sha512_final(&state, this->session_key);
+        crypto_generichash_init(&state, NULL, 0, BLAKE2b_SIZE);
+        crypto_generichash_update(&state, scalarmult_shared_key, crypto_scalarmult_BYTES);
+        crypto_generichash_update(&state, this->kx_pk, crypto_box_PUBLICKEYBYTES);
+        crypto_generichash_update(&state, server_kx_pk, crypto_box_PUBLICKEYBYTES);
+        crypto_generichash_final(&state, this->session_key, BLAKE2b_SIZE);
 
         sodium_mprotect_noaccess(this->session_key);
 

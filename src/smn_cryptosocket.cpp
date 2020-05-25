@@ -117,9 +117,15 @@ static cell_t EncryptedSocketSend(IPluginContext *pContext, const cell_t *params
     return 0;
 }
 
+static cell_t EncryptedSocketConnected(IPluginContext *pContext, const cell_t *params) {
+    READ_HANDLE(pContext, params);
+    return socket->connected.load();
+}
+
 const sp_nativeinfo_t smcryptosocket_natives[] = {
     {"EncryptedSocket.EncryptedSocket", CreateEncryptedSocket},
     {"EncryptedSocket.Connect", EncryptedSocketConnect},
     {"EncryptedSocket.Send", EncryptedSocketSend},
+    {"EncryptedSocket.Connected", EncryptedSocketConnected},
     {NULL, NULL}
 };
