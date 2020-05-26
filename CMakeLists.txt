@@ -12,6 +12,7 @@ if(NOT TARGET)
     set(TARGET linux)
 endif()
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -pipe -DSOURCEMOD_BUILD -fno-strict-aliasing -m32")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g3")
 
 if(${TARGET} STREQUAL linux)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_LINUX")
@@ -31,7 +32,7 @@ add_library(cryptosocket.ext SHARED ${SOURCE_FILES})
 if(${TARGET} STREQUAL linux)
     target_link_libraries(cryptosocket.ext -lpthread -Wl,--no-undefined -Wl,-Bstatic -lsodium -static-libgcc -lboost_system -static-libstdc++ -Wl,-Bdynamic)
 else()
-    target_link_libraries(cryptosocket.ext -Wl,--no-undefined -Wl,-Bstatic -lsodium -static-libgcc -lboost_system -static-libstdc++ -Wl,-Bdynamic -lwsock32 -lgdi32 -lws2_32)
+    target_link_libraries(cryptosocket.ext -Wl,--no-undefined -Wl,-Bstatic -lsodium -static-libgcc -lboost_system -static-libstdc++ -lstdc++ -lpthread -Wl,-Bdynamic -lwsock32 -lgdi32 -lws2_32)
 endif()
 
 

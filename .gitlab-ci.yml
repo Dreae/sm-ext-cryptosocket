@@ -22,7 +22,7 @@ build:linux:
 build:windows:
     stage: build
     before_script:
-    - dnf -y install mingw32-gcc mingw32-gcc-c++ cmake make mingw32-boost-static findutils
+    - dnf -y install mingw32-gcc mingw32-gcc-c++ cmake make mingw32-boost-static mingw32-winpthreads-static findutils
     variables:
         CFLAGS: "-Ofast -fomit-frame-pointer -m32 -march=pentium3 -mtune=westmere"
     script:
@@ -52,3 +52,6 @@ bundle:all:
     dependencies:
     - build:linux
     - build:windows
+    artifacts:
+        paths:
+        - build/cryptosocket.tar.bz2
