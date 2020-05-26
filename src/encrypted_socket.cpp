@@ -1,5 +1,5 @@
 #include "encrypted_socket.hpp"
-#include "sodium.h"
+#include <sodium.h>
 #include <boost/endian/conversion.hpp>
 #include "crypto_ev.hpp"
 

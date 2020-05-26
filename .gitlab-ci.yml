@@ -1,0 +1,54 @@
+image: fedora:28
+variables:
+    GIT_SUBMODULE_STRATEGY: recursive
+
+stages:
+    - build
+    - bundle
+
+build:linux:
+    stage: build
+    before_script:
+    - dnf -y install gcc gcc-c++ make cmake libsodium-static.i686 libsodium-devel boost-static.i686 boost-devel glibc-static.i686 libstdc++-static.i686 glibc-devel.i686
+    script:
+    - mkdir build
+    - cd build
+    - cmake -DCMAKE_BUILD_TYPE=Release ..
+    - make
+    artifacts:
+        paths:
+        - build/cryptosocket.ext.so
+
+build:windows:
+    stage: build
+    before_script:
+    - dnf -y install mingw32-gcc mingw32-gcc-c++ cmake make mingw32-boost-static findutils
+    variables:
+        CFLAGS: "-Ofast -fomit-frame-pointer -m32 -march=pentium3 -mtune=westmere"
+    script:
+    - mkdir build
+    - cd build
+    - curl -o libsodium.tar.gz https://download.libsodium.org/libsodium/releases/LATEST.tar.gz
+    - tar -xvf libsodium.tar.gz
+    - cd libsodium-stable
+    - ./configure --host=i686-w64-mingw32 --prefix=/usr/i686-w64-mingw32/
+    - make && make install
+    - cd ../
+    - CC=i686-w64-mingw32-gcc CXX=i686-w64-mingw32-g++ cmake -DTARGET=windows -DCMAKE_BUILD_TYPE=Release ..
+    - make
+    artifacts:
+        paths:
+        - build/cryptosocket.ext.dll
+
+bundle:all:
+    stage: bundle
+    script:
+    - cd build
+    - mkdir -p addons/sourcemod/extensions
+    - cp cryptosocket.ext.so addons/sourcemod/extensions
+    - cp cryptosocket.ext.dll addons/sourcemod/extensions
+    - cp -r ../scripting addons/sourcemod
+    - tar -cvf cryptosocket.tar.bz2 addons/
+    dependencies:
+    - build:linux
+    - build:windows

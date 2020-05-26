@@ -31,7 +31,7 @@ add_library(cryptosocket.ext SHARED ${SOURCE_FILES})
 if(${TARGET} STREQUAL linux)
     target_link_libraries(cryptosocket.ext -lpthread -Wl,--no-undefined -Wl,-Bstatic -lsodium -static-libgcc -lboost_system -static-libstdc++ -Wl,-Bdynamic)
 else()
-    target_link_libraries(cryptosocket.ext -Wl,--no-undefined -Wl,-Bstatic -lc -lsodium -static-libgcc -lboost_system -static-libstdc++ -Wl,-Bdynamic -lm -lwsock32 -lgdi32 -lws2_32)
+    target_link_libraries(cryptosocket.ext -Wl,--no-undefined -Wl,-Bstatic -lsodium -static-libgcc -lboost_system -static-libstdc++ -Wl,-Bdynamic -lwsock32 -lgdi32 -lws2_32)
 endif()
 
 

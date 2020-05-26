@@ -1,5 +1,5 @@
 #include "extension.hpp"
-#include "sodium.h"
+#include <sodium.h>
 
 CryptoSockets extension;
 SMEXT_LINK(&extension);
