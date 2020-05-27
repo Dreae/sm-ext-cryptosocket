@@ -24,6 +24,8 @@ build:windows:
     tags: 
     - windows
     script:
+    - mkdir build
+    - cd build
     - cmd /c "..\build.bat"
     artifacts:
         paths:
