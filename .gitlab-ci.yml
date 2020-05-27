@@ -24,10 +24,10 @@ build:windows:
     tags: 
     - windows
     script:
-    - ../build.bat
+    - cmd /c "../build.bat"
     artifacts:
         paths:
-        - build/cryptosocket.ext.dll
+        - build/Release/cryptosocket.ext.dll
 
 bundle:all:
     stage: bundle
@@ -35,12 +35,13 @@ bundle:all:
     - cd build
     - mkdir -p addons/sourcemod/extensions
     - cp cryptosocket.ext.so addons/sourcemod/extensions
-    - cp cryptosocket.ext.dll addons/sourcemod/extensions
+    - cp Release/cryptosocket.ext.dll addons/sourcemod/extensions
     - cp -r ../scripting addons/sourcemod
     - tar -cvf cryptosocket.tar.bz2 addons/
+    - cp cryptosocket.tar.bz2 ../
     dependencies:
     - build:linux
     - build:windows
     artifacts:
         paths:
-        - build/cryptosocket.tar.bz2
+        - cryptosocket.tar.bz2
