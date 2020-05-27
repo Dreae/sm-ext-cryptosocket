@@ -24,7 +24,7 @@ build:windows:
     tags: 
     - windows
     script:
-    - cmd /c "$ENV:CI_BUILDS_DIR/build.bat"
+    - cmd /c "..\build.bat"
     artifacts:
         paths:
         - build/Release/cryptosocket.ext.dll
