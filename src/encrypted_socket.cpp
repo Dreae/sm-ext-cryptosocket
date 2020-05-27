@@ -165,7 +165,7 @@ void encrypted_socket::start_msg_loop() {
 
 void encrypted_socket::send(unique_ptr<uint8_t[]> data, size_t data_size) {
     auto nonce = this->generate_nonce();
-    unsigned char ciphertext[data_size + crypto_aead_chacha20poly1305_IETF_ABYTES];
+    unsigned char *ciphertext = reinterpret_cast<unsigned char *>(malloc(data_size + crypto_aead_chacha20poly1305_IETF_ABYTES));
     unsigned long long ciphertext_len;
 
     sodium_mprotect_readonly(this->session_key);
@@ -180,6 +180,7 @@ void encrypted_socket::send(unique_ptr<uint8_t[]> data, size_t data_size) {
     buffer.insert(buffer.end(), reinterpret_cast<const char *>(&msg_len), reinterpret_cast<const char *>(&msg_len) + 2);
     buffer.insert(buffer.end(), nonce.begin(), nonce.begin() + crypto_aead_chacha20poly1305_IETF_NPUBBYTES);
     buffer.insert(buffer.end(), reinterpret_cast<const char *>(ciphertext), reinterpret_cast<const char *>(ciphertext) + ciphertext_len);
+    free(ciphertext);
     
     boost::asio::async_write(*this->socket, boost::asio::buffer(buffer), [this](boost::system::error_code ec, size_t n_written) {
         if (ec) {

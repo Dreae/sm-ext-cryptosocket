@@ -21,21 +21,12 @@ build:linux:
 
 build:windows:
     stage: build
-    before_script:
-    - dnf -y install mingw32-gcc mingw32-gcc-c++ cmake make mingw32-boost-static mingw32-winpthreads-static findutils
-    variables:
-        CFLAGS: "-Ofast -fomit-frame-pointer -m32 -march=pentium3 -mtune=westmere"
+    tags: 
+    - windows
     script:
-    - mkdir build
-    - cd build
-    - curl -o libsodium.tar.gz https://download.libsodium.org/libsodium/releases/LATEST.tar.gz
-    - tar -xvf libsodium.tar.gz
-    - cd libsodium-stable
-    - ./configure --host=i686-w64-mingw32 --prefix=/usr/i686-w64-mingw32/
-    - make && make install
-    - cd ../
-    - CC=i686-w64-mingw32-gcc CXX=i686-w64-mingw32-g++ cmake -DTARGET=windows -DCMAKE_BUILD_TYPE=Release ..
-    - make
+    - 'call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Professional\Common7\Tools\VsDevCmd.bat"'
+    - cmake -DTARGET=windows -DCMAKE_BUILD_TYPE=Release ..
+    - cmake --build . --config Release
     artifacts:
         paths:
         - build/cryptosocket.ext.dll
