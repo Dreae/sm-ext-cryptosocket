@@ -39,5 +39,5 @@ public Action socket_connect(int args) {
 }
 
 public void data_callback(const char[] data, int data_size) {
-    PrintToServer("Got data %s", data);
+    PrintToServer("Got data %s %d", data, data_size);
 }

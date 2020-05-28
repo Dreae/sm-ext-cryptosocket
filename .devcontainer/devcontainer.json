@@ -8,7 +8,8 @@
 		"ms-vscode.cpptools",
         "ms-vscode.cmake-tools",
 		"dreae.sourcepawn-vscode",
-		"gruntfuggly.todo-tree"
+		"gruntfuggly.todo-tree",
+		"yzhang.markdown-all-in-one"
 	],
 	"remoteUser": "dev"
 }

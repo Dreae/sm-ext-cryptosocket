@@ -1,15 +1,36 @@
+ /**
+  * SourceMod Encrypted Socket Extension
+  * Copyright (C) 2020  Dreae
+  *
+  * This program is free software: you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+  * the Free Software Foundation, either version 3 of the License, or
+  * (at your option) any later version.
+  *
+  * This program is distributed in the hope that it will be useful,
+  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details. 
+  *
+  * You should have received a copy of the GNU General Public License
+  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include "encrypted_socket.hpp"
 #include <sodium.h>
 #include <boost/endian/conversion.hpp>
 #include "crypto_ev.hpp"
+#include "crypto.hpp"
 
+#define CHAIN_KEY_SIZE crypto_auth_hmacsha512256_KEYBYTES
 #define BLAKE2b_SIZE 64
 
 encrypted_socket::encrypted_socket(string key_id, string key, data_callback data_cb) {
     this->socket = make_unique<tcp::socket>(event_loop.get_context());
     this->work = make_unique<boost::asio::io_context::work>(event_loop.get_context());
     this->buffer = nullptr;
-    this->session_key = reinterpret_cast<uint8_t *>(sodium_malloc(BLAKE2b_SIZE));
+    this->c_r = reinterpret_cast<uint8_t *>(sodium_malloc(CHAIN_KEY_SIZE));
+    this->c_m = reinterpret_cast<uint8_t *>(sodium_malloc(CHAIN_KEY_SIZE));
     this->kx_pk = reinterpret_cast<uint8_t *>(sodium_malloc(crypto_box_PUBLICKEYBYTES));
     this->kx_sk = reinterpret_cast<uint8_t *>(sodium_malloc(crypto_box_SECRETKEYBYTES));
     this->connected.store(false);
@@ -21,15 +42,14 @@ encrypted_socket::encrypted_socket(string key_id, string key, data_callback data
     this->key_size = key.size();
 
     this->data_cb = data_cb;
-
-    randombytes_buf(this->nonce_seed, sizeof(this->nonce_seed));
 }
 
 encrypted_socket::~encrypted_socket() {
     sodium_free(this->key);
     sodium_free(this->kx_sk);
     sodium_free(this->kx_pk);
-    sodium_free(this->session_key);
+    sodium_free(this->c_r);
+    sodium_free(this->c_m);
 }
 
 void encrypted_socket::connect(optional<connect_callback> callback, string address, uint16_t port) {
@@ -65,15 +85,20 @@ void encrypted_socket::start_kx(optional<connect_callback> callback) {
     crypto_scalarmult_base(this->kx_pk, this->kx_sk);
     sodium_mprotect_noaccess(this->kx_sk);
 
+    uint8_t salt[32];
+    randombytes_buf(salt, sizeof(salt));
+
     vector<uint8_t> buffer;
     buffer.insert(buffer.end(), reinterpret_cast<uint8_t *>(this->kx_pk), this->kx_pk + crypto_box_PUBLICKEYBYTES);
+    buffer.insert(buffer.end(), salt, salt + 32);
     buffer.insert(buffer.end(), reinterpret_cast<const uint8_t *>(this->key_id.c_str()), reinterpret_cast<const uint8_t *>(this->key_id.c_str()) + this->key_id.size());
     buffer.push_back(0);
     
-    unsigned char derived_key[BLAKE2b_SIZE];
+    uint8_t derived_key[32];
+    const uint8_t ctx[] = "SMCRYPTO_KEY";
 
     sodium_mprotect_readonly(this->key);
-    crypto_generichash(derived_key, BLAKE2b_SIZE, reinterpret_cast<const unsigned char*>(this->key), this->key_size, NULL, 0);
+    hkdf(salt, sizeof(salt), reinterpret_cast<uint8_t *>(this->key), this->key_size, ctx, 12, derived_key, sizeof(derived_key));
     sodium_mprotect_noaccess(this->key);
 
     unsigned char mac[crypto_auth_BYTES];
@@ -95,21 +120,19 @@ void encrypted_socket::start_kx(optional<connect_callback> callback) {
 void encrypted_socket::finish_kx(optional<connect_callback> callback) {
     this->start_read_msg([this, callback](uint8_t *buffer, size_t msg_len) {
         auto server_kx_pk = reinterpret_cast<const unsigned char*>(buffer);
-        auto server_key_id = reinterpret_cast<const char*>(server_kx_pk) + crypto_box_PUBLICKEYBYTES;
+        auto salt = server_kx_pk + crypto_box_PUBLICKEYBYTES;
+        auto server_key_id = reinterpret_cast<const char*>(salt) + 32;
         auto key_id_len = strlen(server_key_id);
         auto signature = reinterpret_cast<const unsigned char*>(server_key_id) + key_id_len + 1;
 
-        unsigned char derived_key[BLAKE2b_SIZE];
-        crypto_generichash_state state;
-        crypto_generichash_init(&state, NULL, 0, BLAKE2b_SIZE);
-        
+        uint8_t derived_key[32];
+        const uint8_t d_ctx[] = "SMCRYPTO_KEY";
+
         sodium_mprotect_readonly(this->key);
-        crypto_generichash_update(&state, reinterpret_cast<const unsigned char*>(this->key), this->key_size);
+        hkdf(salt, 32, reinterpret_cast<uint8_t *>(this->key), this->key_size, d_ctx, 12, derived_key, sizeof(derived_key));
         sodium_mprotect_noaccess(this->key);
 
-        crypto_generichash_final(&state, derived_key, BLAKE2b_SIZE);
-
-        if (crypto_auth_verify(signature, server_kx_pk, crypto_box_PUBLICKEYBYTES + key_id_len + 1, derived_key) != 0) {
+        if (crypto_auth_verify(signature, server_kx_pk, crypto_box_PUBLICKEYBYTES + 32 + key_id_len + 1, derived_key) != 0) {
             extension.LogError("Hanshake error, signature mismatch");
             return;
         }
@@ -123,13 +146,19 @@ void encrypted_socket::finish_kx(optional<connect_callback> callback) {
         }
         sodium_mprotect_noaccess(this->kx_sk);
 
-        crypto_generichash_init(&state, NULL, 0, BLAKE2b_SIZE);
-        crypto_generichash_update(&state, scalarmult_shared_key, crypto_scalarmult_BYTES);
-        crypto_generichash_update(&state, this->kx_pk, crypto_box_PUBLICKEYBYTES);
-        crypto_generichash_update(&state, server_kx_pk, crypto_box_PUBLICKEYBYTES);
-        crypto_generichash_final(&state, this->session_key, BLAKE2b_SIZE);
+        uint8_t session_key[CHAIN_KEY_SIZE * 2];
+        const char ctx[] = "\x01";
+        vector<uint8_t> sk_buf;
+        sk_buf.insert(sk_buf.end(), scalarmult_shared_key, scalarmult_shared_key + crypto_scalarmult_BYTES);
+        sk_buf.insert(sk_buf.end(), this->kx_pk, this->kx_pk + crypto_box_PUBLICKEYBYTES);
+        sk_buf.insert(sk_buf.end(), server_kx_pk, server_kx_pk + crypto_box_PUBLICKEYBYTES);
+        
+        hkdf(NULL, 0, sk_buf.data(), sk_buf.size(), reinterpret_cast<const uint8_t *>(ctx), 1, session_key, sizeof(session_key));
+        memcpy(this->c_r, session_key, CHAIN_KEY_SIZE);
+        memcpy(this->c_m, session_key + CHAIN_KEY_SIZE, CHAIN_KEY_SIZE);
 
-        sodium_mprotect_noaccess(this->session_key);
+        sodium_mprotect_noaccess(this->c_r);
+        sodium_mprotect_noaccess(this->c_m);
 
         if (callback.has_value()) {
             (*callback)();
@@ -141,44 +170,38 @@ void encrypted_socket::finish_kx(optional<connect_callback> callback) {
 
 void encrypted_socket::start_msg_loop() {
     this->start_read_msg([this](uint8_t *data, size_t size) {
-        auto nonce = data;
-        auto ciphertext = nonce + crypto_aead_chacha20poly1305_IETF_NPUBBYTES;
-        auto ciphertext_len = size - crypto_aead_chacha20poly1305_IETF_NPUBBYTES;
         auto decrypted = reinterpret_cast<uint8_t *>(malloc(size));
         unsigned long long decrypted_len;
 
-        sodium_mprotect_readonly(this->session_key);
+        vector<uint8_t> read_keys = this->derive_recv_keys();
         if (crypto_aead_chacha20poly1305_ietf_decrypt(decrypted, &decrypted_len, 
-                                                    NULL, ciphertext, ciphertext_len, 
+                                                    NULL, data, size, 
                                                     reinterpret_cast<const unsigned char *>(this->key_id.c_str()), 
-                                                    this->key_id.size(), nonce, this->session_key) != 0) {
+                                                    this->key_id.size(), read_keys.data() + 32, read_keys.data()) != 0) {
             extension.LogError("Failed to decrypt message; key_id: %s", this->key_id.c_str());
         } else {
             this->data_cb(decrypted, decrypted_len);
             free(decrypted);
         }
-        sodium_mprotect_noaccess(this->session_key);
 
         this->start_msg_loop();
     });
 }
 
 void encrypted_socket::send(unique_ptr<uint8_t[]> data, size_t data_size) {
-    auto nonce = this->generate_nonce();
     unsigned char *ciphertext = reinterpret_cast<unsigned char *>(malloc(data_size + crypto_aead_chacha20poly1305_IETF_ABYTES));
     unsigned long long ciphertext_len;
 
-    sodium_mprotect_readonly(this->session_key);
+    vector<uint8_t> write_keys = this->derive_msg_keys();
     crypto_aead_chacha20poly1305_ietf_encrypt(ciphertext, &ciphertext_len, 
                                          data.get(), data_size, 
                                          reinterpret_cast<const unsigned char *>(this->key_id.c_str()), 
-                                         this->key_id.size(), NULL, nonce.data(), this->session_key);
-    sodium_mprotect_noaccess(this->session_key);
-    uint16_t msg_len = boost::endian::native_to_big(static_cast<uint16_t>(ciphertext_len + crypto_aead_chacha20poly1305_IETF_NPUBBYTES));
+                                         this->key_id.size(), NULL, write_keys.data() + 32, write_keys.data());
+
+    uint16_t msg_len = boost::endian::native_to_big(static_cast<uint16_t>(ciphertext_len));
 
     vector<uint8_t> buffer;
     buffer.insert(buffer.end(), reinterpret_cast<const char *>(&msg_len), reinterpret_cast<const char *>(&msg_len) + 2);
-    buffer.insert(buffer.end(), nonce.begin(), nonce.begin() + crypto_aead_chacha20poly1305_IETF_NPUBBYTES);
     buffer.insert(buffer.end(), reinterpret_cast<const char *>(ciphertext), reinterpret_cast<const char *>(ciphertext) + ciphertext_len);
     free(ciphertext);
     
@@ -189,18 +212,31 @@ void encrypted_socket::send(unique_ptr<uint8_t[]> data, size_t data_size) {
     });
 }
 
-vector<uint8_t> encrypted_socket::generate_nonce() {
-    uint32_t counter = this->nonce_counter.fetch_add(1, memory_order_acq_rel);
-    vector<uint8_t> nonce;
-    nonce.reserve(crypto_hash_sha512_BYTES);
+void advance_chain_key(uint8_t *chain_key) {
+    const unsigned char in[] = "\x02";
+    crypto_auth_hmacsha512256(chain_key, in, 1, chain_key);
+}
 
-    crypto_hash_sha512_state state;
-    crypto_hash_sha512_init(&state);
-    crypto_hash_sha512_update(&state, this->nonce_seed, sizeof(this->nonce_seed));
-    crypto_hash_sha512_update(&state, reinterpret_cast<unsigned char *>(&counter), 4);
-    crypto_hash_sha512_final(&state, nonce.data());
+vector<uint8_t> derive_keys(uint8_t *chain_key) {
 
-    return nonce;
+    char ctx[] = "SMCRYPTO_KEYS";
+    
+    uint8_t keys[44];
+    sodium_mprotect_readonly(chain_key);
+    hkdf(NULL, 0, chain_key, CHAIN_KEY_SIZE, reinterpret_cast<uint8_t *>(ctx), 13, keys, sizeof(keys));
+    sodium_mprotect_readwrite(chain_key);
+    advance_chain_key(chain_key);
+    sodium_mprotect_noaccess(chain_key);
+
+    return vector(keys, keys + 44);
+}
+
+vector<uint8_t> encrypted_socket::derive_msg_keys() {
+    return derive_keys(this->c_m);
+}
+
+vector<uint8_t> encrypted_socket::derive_recv_keys() {
+    return derive_keys(this->c_r);
 }
 
 void encrypted_socket::start_read_msg(data_callback callback) {
