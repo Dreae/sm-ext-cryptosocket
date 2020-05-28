@@ -6,7 +6,8 @@ set(SOURCE_FILES
     src/smn_cryptosocket.cpp
     src/extension.cpp
     src/encrypted_socket.cpp
-    src/crypto_ev.cpp)
+    src/crypto_ev.cpp
+    src/crypto.cpp)
 
 if(NOT TARGET)
     set(TARGET linux)
