@@ -2,7 +2,7 @@
     #endinput
 #endif
 #define __cryptosocket_included
-#define CRYPTOSOCKET_VERSION "1.0.0"
+#define CRYPTOSOCKET_VERSION "1.0.1"
 
 /**
  * Callback for receiving decrypted data from an EncryptedSocket
@@ -14,6 +14,7 @@
  * @param data_size           The size of the data received
  */
 typedef DataCallback = function void (const char[] data, int data_size);
+typedef ConnectionCallback = function void (EncryptedSocket socket);
 
 methodmap EncryptedSocket < Handle {
     /**
@@ -37,8 +38,9 @@ methodmap EncryptedSocket < Handle {
      *
      * @param address             The IP address or domain name to connect to
      * @param port                The port to connect to
+     * @param connect_callback    Optional callback to call once the socket is connected
      */
-    public native void Connect(const char[] address, int port);
+    public native void Connect(const char[] address, int port, ConnectionCallback connect_callback = null);
 
     /**
      * Tests if this socket is currently connected to another EncryptedSocket
@@ -59,6 +61,14 @@ methodmap EncryptedSocket < Handle {
      *                            at the end of the buffer will also be sent.
      */
     public native void Send(const char[] data, int data_size);
+
+    /**
+     * Adds a disconnect callback to this socket.
+     * 
+     * @param callback            The callback which will be called if this socket is
+     *                            disconnected from the remote endpoint.
+     */
+    public native void OnDisconnected(ConnectionCallback callback);
 }
 
 public Extension:__ext_cryptosocket = {

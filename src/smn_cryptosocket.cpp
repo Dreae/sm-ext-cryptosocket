@@ -101,6 +101,7 @@ static cell_t EncryptedSocketConnect(IPluginContext *pContext, const cell_t *par
     char *address;
     pContext->LocalToString(params[2], &address);
     uint16_t port = params[3];
+    auto handle = params[1];
     auto callback = pContext->GetFunctionById((funcid_t)params[4]);
 
     auto addr = string(address);
@@ -108,8 +109,9 @@ static cell_t EncryptedSocketConnect(IPluginContext *pContext, const cell_t *par
     if (!callback) {
         socket->connect(nullopt, addr, port);
     } else {
-        socket->connect([callback]() {
-            extension.Defer([callback]() {
+        socket->connect([callback, handle]() {
+            extension.Defer([callback, handle]() {
+                callback->PushCell(handle);
                 callback->Execute(nullptr);
             });
         }, addr, port);
@@ -140,10 +142,30 @@ static cell_t EncryptedSocketConnected(IPluginContext *pContext, const cell_t *p
     return socket->connected.load();
 }
 
+static cell_t EncryptedSocketOnDisconnected(IPluginContext *pContext, const cell_t *params) {
+    READ_HANDLE(pContext, params);
+    auto handle = params[1];
+    auto callback = pContext->GetFunctionById(params[2]);
+    if (!callback) {
+        pContext->ReportError("Invalid disconnect callback provided");
+        return 0;
+    }
+
+    socket->set_disconnect_cb([callback, handle]() {
+        extension.Defer([callback, handle]() {
+            callback->PushCell(handle);
+            callback->Execute(nullptr);
+        });
+    });
+
+    return 0;
+}
+
 const sp_nativeinfo_t smcryptosocket_natives[] = {
     {"EncryptedSocket.EncryptedSocket", CreateEncryptedSocket},
     {"EncryptedSocket.Connect", EncryptedSocketConnect},
     {"EncryptedSocket.Send", EncryptedSocketSend},
     {"EncryptedSocket.Connected", EncryptedSocketConnected},
+    {"EncryptedSocket.OnDisconnected", EncryptedSocketOnDisconnected},
     {NULL, NULL}
 };

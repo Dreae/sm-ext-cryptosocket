@@ -34,6 +34,7 @@ public:
     encrypted_socket(string key_id, string key, data_callback callback);
     ~encrypted_socket();
     void connect(optional<connect_callback> callback, string address, uint16_t  port);
+    void set_disconnect_cb(connect_callback cb);
     void send(unique_ptr<uint8_t[]> data, size_t data_size);
     atomic<bool> connected;
 private:

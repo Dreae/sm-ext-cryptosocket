@@ -68,5 +68,6 @@
         "queue": "cpp",
         "*.ipp": "cpp"
     },
-    "sourcepawnLanguageServer.sourcemod_home": "/workspaces/sm-ext-cryptosocket/sourcemod/plugins/include"
+    "sourcepawnLanguageServer.sourcemod_home": "/workspaces/sm-ext-cryptosocket/sourcemod/plugins/include",
+    "mdmath.delimiters": "gitlab"
 }

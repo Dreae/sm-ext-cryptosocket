@@ -278,3 +278,7 @@ void encrypted_socket::check_ec(boost::system::error_code& ec) {
         }
     }
 }
+
+void encrypted_socket::set_disconnect_cb(connect_callback callback) {
+    this->disconnected_cb = optional<connect_callback>(callback);
+}
