@@ -40,7 +40,7 @@ methodmap EncryptedSocket < Handle {
      * @param port                The port to connect to
      * @param connect_callback    Optional callback to call once the socket is connected
      */
-    public native void Connect(const char[] address, int port, ConnectionCallback connect_callback = null);
+    public native void Connect(const char[] address, int port, ConnectionCallback connect_callback=INVALID_FUNCTION);
 
     /**
      * Tests if this socket is currently connected to another EncryptedSocket
