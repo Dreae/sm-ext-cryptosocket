@@ -18,11 +18,13 @@
 
 #include "extension.hpp"
 #include <sodium.h>
+#include <atomic>
 
 CryptoSockets extension;
 SMEXT_LINK(&extension);
 
 CryptoSockBase *CryptoSockBase::head = NULL;
+std::atomic<bool> unloaded;
 
 bool CryptoSockets::SDK_OnLoad(char *error, size_t err_max, bool late) {
     int sodium_res;
@@ -36,6 +38,7 @@ bool CryptoSockets::SDK_OnLoad(char *error, size_t err_max, bool late) {
         head = head->next;
     }
     
+    unloaded.store(false);
     return true;
 }
 
@@ -45,16 +48,22 @@ void CryptoSockets::SDK_OnUnload() {
         head->OnExtUnload();
         head = head->next;
     }
+
+    unloaded.store(true);
 }
 
 void log_msg(void *msg) {
-    smutils->LogMessage(myself, reinterpret_cast<char *>(msg));
+    if (!unloaded.load()) {
+        smutils->LogMessage(myself, reinterpret_cast<char *>(msg));
+    }
     free(msg);
 }
 
 
 void log_err(void *msg) {
-    smutils->LogError(myself, reinterpret_cast<char *>(msg));
+    if (!unloaded.load()) {
+        smutils->LogError(myself, reinterpret_cast<char *>(msg));
+    }
     free(msg);
 }
 

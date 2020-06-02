@@ -2,7 +2,7 @@
     #endinput
 #endif
 #define __cryptosocket_included
-#define CRYPTOSOCKET_VERSION "1.0.1"
+#define CRYPTOSOCKET_VERSION "1.0.3"
 
 /**
  * Callback for receiving decrypted data from an EncryptedSocket
