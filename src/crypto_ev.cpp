@@ -30,6 +30,7 @@ void crypto_event_loop::OnExtLoad() {
 
 void crypto_event_loop::OnExtUnload() {
     this->context.stop();
+    this->context.reset();
 }
 
 void crypto_event_loop::run() {

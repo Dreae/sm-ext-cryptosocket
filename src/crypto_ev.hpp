@@ -36,7 +36,7 @@ public:
     boost::asio::io_context& get_context();
 private:
     boost::asio::io_context context;
-    boost::asio::io_context::work work;    
+    boost::asio::io_context::work work;
 };
 
 extern crypto_event_loop event_loop;
