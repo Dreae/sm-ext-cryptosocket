@@ -39,8 +39,8 @@
 
 /* Basic information exposed publicly */
 #define SMEXT_CONF_NAME			"CryptoSockets"
-#define SMEXT_CONF_DESCRIPTION	""
-#define SMEXT_CONF_VERSION		"1.0.3"
+#define SMEXT_CONF_DESCRIPTION	"Encrypted socket communication for SourceMod"
+#define SMEXT_CONF_VERSION		"1.0.4"
 #define SMEXT_CONF_AUTHOR		"Dreae"
 #define SMEXT_CONF_URL			"https://gitlab.com/Dreae/sm-ext-cryptosocket/"
 #define SMEXT_CONF_LOGTAG		"CRYPTOSOCKETS"
